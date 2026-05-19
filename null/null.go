@@ -2,25 +2,25 @@ package null
 
 import (
 	"fmt"
-	"github.com/imoutofideas/audigo"
+	"github.com/ImOutOfIdeas/audigo/internal"
 )
 
-type Backend struct{}
+type nullBackend struct{}
 
-func New() *Backend {
-	return &Backend{}
+func New() (internal.Backend, error) {
+	return &nullBackend{}, nil
 }
 
-func (b *Backend) OpenStream(cfg audigo.StreamConfig) (audigo.Stream, error) {
+func (b *nullBackend) OpenStream(cfg internal.StreamConfig) (internal.Stream, error) {
 	return &stream{cfg: cfg}, nil
 }
 
-func (b *Backend) Close() error {
+func (b *nullBackend) Close() error {
 	return nil
 }
 
 type stream struct {
-	cfg     audigo.StreamConfig
+	cfg     internal.StreamConfig
 	running bool
 }
 

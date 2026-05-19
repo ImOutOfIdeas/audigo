@@ -3,15 +3,18 @@ package null_test
 import (
     "testing"
 
-    "github.com/imoutofideas/audigo"
-    "github.com/imoutofideas/audigo/null"
+    "github.com/ImOutOfIdeas/audigo/internal"
+    "github.com/ImOutOfIdeas/audigo/null"
 )
 
 func TestStreamLifecycle(t *testing.T) {
-    b := null.New()
+    b, err := null.New()
+	if err != nil {
+		t.Fatal(err)
+	}
     defer b.Close()
 
-    s, err := b.OpenStream(audigo.StreamConfig{
+    s, err := b.OpenStream(internal.StreamConfig{
         Channels:   2,
         SampleRate: 44100,
     })
