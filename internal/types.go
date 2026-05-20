@@ -2,6 +2,7 @@ package internal
 
 // Sample encoding
 type SampleFormat uint8
+
 const (
 	Float32LE SampleFormat = iota
 	Int16LE
@@ -13,7 +14,7 @@ type StreamConfig struct {
 	Channels   int
 	SampleRate float64
 	BufferSize int
-	Format 	   SampleFormat
+	Format     SampleFormat
 }
 
 // Backend provided stream parameters

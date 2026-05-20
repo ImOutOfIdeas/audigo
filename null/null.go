@@ -29,8 +29,9 @@ func (s *stream) Start() error {
 	return nil
 }
 
-func (s *stream) Stop() error  {
-	s.running = false; return nil
+func (s *stream) Stop() error {
+	s.running = false
+	return nil
 }
 
 func (s *stream) Close() error {
