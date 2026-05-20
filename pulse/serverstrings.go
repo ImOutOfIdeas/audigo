@@ -17,9 +17,10 @@ type serverInfo struct {
 	localname string
 }
 
+// Default TCP port for hostname only command string
 const defaultPulseAudioTCPPort = "4713"
 
-// Return a list of servers to attempt connections on
+// Return a list of servers([]serverInfo) parsed from a server string
 // These are located like so:
 //  - user provided serverString argument
 //  - if empty, PULSE_SERVER environment variable

@@ -2,13 +2,16 @@ package main
 
 import (
 	"fmt"
+	"log"
+
 	"github.com/ImOutOfIdeas/audigo"
 )
 
 func main() {
 	backend, err := audigo.DefaultBackend()
 	if err != nil {
-		fmt.Println("error (main):", err)
+		log.Fatalln("error: ", err)
+
 		return
 	}
 	defer backend.Close()
