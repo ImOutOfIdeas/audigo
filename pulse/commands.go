@@ -1,25 +1,18 @@
 /*
 === PulseAudio Server Packet Format ===
 
- [4 bytes] length of entire payload
+------------- Header -------------
+ [4 bytes] length of payload
  [4 bytes] index (0xFFFFFFFF for command messages)
  [8 bytes] offset (0 for commands)
  [4 bytes] flags (0 for commands)
+
  ------------ Payload ------------
  [1 byte]  'L' (byte marker)
  [4 bytes] command opcode (big-endian uint32)
  [1 byte]  'L' (byte marker)
  [4 bytes] tag (big-endian uint32, used to match replies)
  [...    ] serialized command arguments
-*/
-
-/*
-TODO:
-	implement a command packet constructor with variadic
-	argument for serialized command argument fields
-
-	make_command(opcode, tag?, arguments...)
-
 */
 
 package pulse
@@ -32,66 +25,111 @@ import (
 	"fmt"
 )
 
-func make_auth_packet(cookie []byte) []byte {
-    buf := new(bytes.Buffer)
+/*
+TODO:
+	implement a command packet constructor with variadic
+	argument for serialized command argument fields
 
-    // frame header
-    binary.Write(buf, binary.BigEndian, uint32(0)) // length placeholder
-    binary.Write(buf, binary.BigEndian, uint32(0xFFFFFFFF)) // control channel
-    binary.Write(buf, binary.BigEndian, uint32(0))
-    binary.Write(buf, binary.BigEndian, uint32(0))
-    binary.Write(buf, binary.BigEndian, uint32(0))
+	make_command(opcode, tag?, arguments...)
 
-    payload_start := buf.Len()
+*/
 
-    // PA_COMMAND_AUTH
-    binary.Write(buf, binary.BigEndian, byte(tag_u32))
-    binary.Write(buf, binary.BigEndian, uint32(command_auth))
+// Creates a serialized command packet
+func make_command(opcode uint32, tag uint32, arguments ...any) []byte {
+	payloadBuf := new(bytes.Buffer)
 
-    // tag sequence
-    binary.Write(buf, binary.BigEndian, byte(tag_u32))
-    binary.Write(buf, binary.BigEndian, uint32(1))
+	// Write Opcode
+	payloadBuf.WriteByte('L')
+	binary.Write(payloadBuf, binary.BigEndian, opcode)
 
-    // protocol version, no SHM
-    binary.Write(buf, binary.BigEndian, byte(tag_u32))
-    binary.Write(buf, binary.BigEndian, uint32(protocol_version))
+	// Write Tag
+	payloadBuf.WriteByte('L')
+	binary.Write(payloadBuf, binary.BigEndian, tag)
 
-    // 256-byte zeroed cookie
-    binary.Write(buf, binary.BigEndian, byte(tag_arbitrary))
-    binary.Write(buf, binary.BigEndian, uint32(cookie_length))
-    buf.Write(cookie)
+	// Write each tag/argument pair into the payload
+	for _, arg := range arguments {
+		switch v := arg.(type) {
+		case uint32:
+			payloadBuf.WriteByte(tag_u32)
+			binary.Write(payloadBuf, binary.BigEndian, v)
+		case uint16:
+			payloadBuf.WriteByte(tag_u16)
+			binary.Write(payloadBuf, binary.BigEndian, v)
+		case byte:
+			payloadBuf.WriteByte('B')
+			payloadBuf.WriteByte(v)
+		case []byte:
+			payloadBuf.WriteByte('x')
+			binary.Write(payloadBuf, binary.BigEndian, uint32(len(v)))
+			payloadBuf.Write(v)
+		case string:
+			payloadBuf.WriteByte('Z')
+			payloadBuf.WriteString(v)
+			payloadBuf.WriteByte(0x00) // Null-terminate string
+		default:
+			// Unrecognized type: skip or handle error
+			continue
+		}
+	}
 
-    // fill in payload length
-    packet := buf.Bytes()
-    binary.BigEndian.PutUint32(packet[0:4], uint32(buf.Len()-payload_start))
-
-    return packet
+	return make_command_packet(payloadBuf.Bytes())
 }
 
-func read_auth_reply(conn net.Conn) (uint32, error) {
-    header := make([]byte, 20)
-	_, err := io.ReadFull(conn, header)
-	if err != nil {
-		return 0, err
+// Wraps a payload in a command packet header
+func make_command_packet(payload []byte) []byte {
+	payload_size := len(payload)
+
+	packetBuf := new(bytes.Buffer)
+	packetBuf.Grow(header_length + payload_size)
+
+	// Packet header
+    binary.Write(packetBuf, binary.BigEndian, uint32(payload_size)) // length
+    binary.Write(packetBuf, binary.BigEndian, control_channel)  	// channel
+    binary.Write(packetBuf, binary.BigEndian, uint32(0)) 		    // Offset
+    binary.Write(packetBuf, binary.BigEndian, uint32(0))			// Offset
+    binary.Write(packetBuf, binary.BigEndian, uint32(0))			// Flags
+
+	// Payload
+	packetBuf.Write(payload)
+
+	return packetBuf.Bytes()
+}
+
+func read_auth_reply(conn net.Conn) error {
+	// Read header to extract payload length
+	header := make([]byte, 20)
+	if _, err := io.ReadFull(conn, header); err != nil {
+		return fmt.Errorf("failed to read header: %w", err)
+	}
+	length := binary.BigEndian.Uint32(header[0:4])
+
+	// Read the payload
+	payload := make([]byte, length)
+	if _, err := io.ReadFull(conn, payload); err != nil {
+		return fmt.Errorf("failed to read payload: %w", err)
 	}
 
-    length := binary.BigEndian.Uint32(header[0:4])
-    payload := make([]byte, length)
-	_, err = io.ReadFull(conn, payload)
-	if err != nil {
-		return 0, err
+	// Parse feild by feild with a bytes.Reader
+	r := bytes.NewReader(payload)
+
+	// Read Opcode
+	if marker, _ := r.ReadByte(); marker != 'L' {
+		return fmt.Errorf("invalid opcode marker")
+	}
+	var command uint32
+	binary.Read(r, binary.BigEndian, &command)
+
+	// Read Tag
+	if marker, _ := r.ReadByte(); marker != 'L' {
+		return fmt.Errorf("invalid tag marker")
+	}
+	var tag uint32
+	binary.Read(r, binary.BigEndian, &tag)
+
+	// Validate results
+	if command != command_reply {
+		return fmt.Errorf("auth rejected by server (opcode: %d)", command)
 	}
 
-    // first field is the command: 0 = PA_COMMAND_REPLY, 1 = PA_COMMAND_ERROR
-    command := binary.BigEndian.Uint32(payload[1:5])
-    if command != 0 {
-        return 0, fmt.Errorf("auth rejected, command: %d", command)
-    }
-
-	server_version := binary.BigEndian.Uint32(payload[6:10]) & 0x0000FFFF // mask off SHM/memfd flags
-    //if server_version < b.protocol_version {
-        //b.protocol_version = server_version
-    //}
-
-    return server_version, nil
+	return nil
 }

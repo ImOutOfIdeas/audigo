@@ -29,7 +29,7 @@ func connect() (net.Conn, uint32, error) {
 		return nil, 0, fmt.Errorf("Failed to read cookie file: %w", err)
 	}
 
-	auth_packet := make_auth_packet(cookie)
+	auth_packet := make_command(command_auth, 1, cookie, protocol_version)
 
 	var lastErr error
 	for _, server := range servers {
@@ -46,17 +46,21 @@ func connect() (net.Conn, uint32, error) {
 
 		_, err = conn.Write(auth_packet)
 		if err != nil {
+			conn.Close()
 			lastErr = err
 			continue
 		}
 
-		version, err := read_auth_reply(conn)
+		err = read_auth_reply(conn)
 		if err != nil {
+			conn.Close()
 			lastErr = err
 			continue
 		}
 
-		return conn, version, nil
+		// Send name packet and negotiate version
+
+		return conn, 0, nil
 	}
 
 	return nil, 0, lastErr

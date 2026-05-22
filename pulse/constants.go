@@ -2,14 +2,22 @@ package pulse
 
 // Misc
 const (
-    protocol_version = 35
     cookie_length    = 256
+	header_length    = 20
+
+    protocol_version = uint32(35)
+    control_channel  = uint32(0xFFFFFFFF)
 )
 
 // Datatype tags
 const (
-    tag_u32       = 'L'
-    tag_arbitrary = 'x'
+    tag_arbitrary  = byte('x')
+    tag_bool_false = byte('0')
+    tag_bool_true  = byte('1')
+    tag_string     = byte('t')
+    tag_u8         = byte('B')
+	tag_u16		   = byte('S')
+    tag_u32        = byte('L')
 )
 
 // OP codes (commanly used subset)
