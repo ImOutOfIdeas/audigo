@@ -16,6 +16,8 @@ func main() {
 	}
 	defer backend.Close()
 
+	return
+
 	stream, err := backend.OpenStream(audigo.StreamConfig{
 		Channels:   2,
 		SampleRate: 44100,
@@ -28,4 +30,6 @@ func main() {
 	defer stream.Close()
 
 	fmt.Println("stream opened successfully")
+
+	fmt.Scan()
 }

@@ -6,10 +6,10 @@ import (
 	"github.com/ImOutOfIdeas/audigo/internal"
 )
 
-// Data necassary for holding a pulse server connection
 type pulseBackend struct {
-	connection net.Conn
-	seq        int
+	version    uint32   // Client/Server protocol version
+	connection net.Conn // Connection to PulseAudio server
+	sequenceId uint32   // Id of packet incremented each use
 }
 
 type pulseStream struct {
@@ -19,7 +19,15 @@ type pulseStream struct {
 func New() (internal.Backend, error) {
 	b := pulseBackend{}
 
+	conn, version, err := connect()
+	if err != nil {
+		return &pulseBackend{}, err
+	}
+	b.connection = conn
+	b.version = version
 
+	println("auth reply ok")
+	println("version: ", b.version)
 
 	return &b, nil
 }
@@ -27,10 +35,12 @@ func New() (internal.Backend, error) {
 // === Backend Interface Methods ===
 
 func (b *pulseBackend) OpenStream(internal.StreamConfig) (internal.Stream, error) {
+
 	return nil, nil
 }
 
 func (b *pulseBackend) Close() error {
+	b.connection.Close()
 	return nil
 }
 
