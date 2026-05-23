@@ -1,69 +1,58 @@
 package pulse
 
 import (
-	"net"
-
+	"math"
 	"github.com/ImOutOfIdeas/audigo/internal"
+
+	"github.com/jfreymuth/pulse"
 )
 
-var _ internal.Backend = (*pulseBackend)(nil)
-var _ internal.Stream = (*pulseStream)(nil)
-
 type pulseBackend struct {
-	version    uint32   // Client/Server protocol version
-	connection net.Conn // Connection to PulseAudio server
-	tagId uint32        // Id of packet incremented each use
-	clientIndex uint32 // Index of connection to server
-}
-
-type pulseStream struct {
-
+	client *pulse.Client
 }
 
 func New() (internal.Backend, error) {
-	b := pulseBackend{}
+	var b pulseBackend
 
-	// Connect to pulse server
-	err := connect(&b)
+	client, err := pulse.NewClient()
 	if err != nil {
-		return &pulseBackend{}, err
+		return nil, err
 	}
+
+	b.client = client
 
 	return &b, nil
 }
 
-// === Backend Interface Methods ===
-
 func (b *pulseBackend) OpenStream(internal.StreamConfig) (internal.Stream, error) {
+	stream, err := b.client.NewPlayback(pulse.Float32Reader(synth), pulse.PlaybackLatency(.1))
+	if err != nil {
+		return nil, err
+	}
 
 	return nil, nil
 }
 
 func (b *pulseBackend) Close() error {
-	b.connection.Close()
+	b.Close()
+
 	return nil
 }
 
-// === Stream Interface Methods ===
-
-func (s *pulseStream) Start() error {
-	return nil
-}
-
-func (s *pulseStream) Stop() error {
-	return nil
-}
-
-func (s *pulseStream) Close() error {
-	return nil
-}
-
-func (s *pulseStream) Write(buf []float32) (int, error) {
-	return len(buf), nil
-}
-
-// === Pulse Backend Helpers ===
-func (b *pulseBackend) next() uint32 {
-    b.tagId++
-    return b.tagId
+var t, phase float32
+func synth(out []float32) (int, error) {
+	for i := range out {
+		if t > 4 {
+			return i, pulse.EndOfData
+		}
+		x := float32(math.Sin(2 * math.Pi * float64(phase)))
+		out[i] = x * 0.1
+		f := [...]float32{440, 550, 660, 880}[int(2*t)&3]
+		phase += f / 44100
+		if phase >= 1 {
+			phase--
+		}
+		t += 1. / 44100
+	}
+	return len(out), nil
 }
