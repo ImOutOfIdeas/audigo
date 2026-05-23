@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"os"
 
 	"github.com/ImOutOfIdeas/audigo"
 )
@@ -10,7 +10,7 @@ import (
 func main() {
 	backend, err := audigo.DefaultBackend()
 	if err != nil {
-		log.Fatalln("error: ", err)
+		fmt.Fprintf(os.Stderr, "error in backend init: %v\n", err)
 
 		return
 	}

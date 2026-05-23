@@ -9,6 +9,20 @@ const (
 	Int32LE
 )
 
+// The audio backend of choice
+type Backend interface {
+	OpenStream(StreamConfig) (Stream, error)
+	Close() error
+}
+
+// A single audio stream
+type Stream interface {
+	Start() error
+	Stop() error
+	Close() error
+	Write([]float32) (int, error)
+}
+
 // Callers requested stream parameters
 type StreamConfig struct {
 	Channels   int

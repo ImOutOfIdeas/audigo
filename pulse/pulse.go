@@ -6,10 +6,14 @@ import (
 	"github.com/ImOutOfIdeas/audigo/internal"
 )
 
+var _ internal.Backend = (*pulseBackend)(nil)
+var _ internal.Stream = (*pulseStream)(nil)
+
 type pulseBackend struct {
 	version    uint32   // Client/Server protocol version
 	connection net.Conn // Connection to PulseAudio server
-	sequenceId uint32   // Id of packet incremented each use
+	tagId uint32        // Id of packet incremented each use
+	clientIndex uint32 // Index of connection to server
 }
 
 type pulseStream struct {
@@ -19,15 +23,11 @@ type pulseStream struct {
 func New() (internal.Backend, error) {
 	b := pulseBackend{}
 
-	conn, version, err := connect()
+	// Connect to pulse server
+	err := connect(&b)
 	if err != nil {
 		return &pulseBackend{}, err
 	}
-	b.connection = conn
-	b.version = version
-
-	println("auth reply ok")
-	println("version: ", b.version)
 
 	return &b, nil
 }
@@ -60,4 +60,10 @@ func (s *pulseStream) Close() error {
 
 func (s *pulseStream) Write(buf []float32) (int, error) {
 	return len(buf), nil
+}
+
+// === Pulse Backend Helpers ===
+func (b *pulseBackend) next() uint32 {
+    b.tagId++
+    return b.tagId
 }
